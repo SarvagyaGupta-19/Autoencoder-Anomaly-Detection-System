@@ -37,6 +37,8 @@ ENCODER_PATH = os.path.join(MODEL_DIR, "encoder.keras")
 PCA_PATH = os.path.join(MODEL_DIR, "pca_model.joblib")
 SCALER_PATH = os.path.join(MODEL_DIR, "scaler.joblib")
 ANOMALY_STATS_PATH = os.path.join(MODEL_DIR, "anomaly_stats.joblib")
+STGRAM_MODEL_PATH = os.path.join(MODEL_DIR, "stgram_mfn.pth")
+STGRAM_GMM_PATH = os.path.join(MODEL_DIR, "stgram_gmm.joblib")
 
 # ──────────────────────────────────────────────
 # AUDIO / SPECTROGRAM PARAMETERS
