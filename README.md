@@ -1,177 +1,153 @@
-# 🔊 CNN-Based Spectrogram Model for Machine Sound Analysis
+# 🔊 Anomalous Sound Detection: Deep Learning Pipeline
 
-Anomalous sound detection system using a **CNN Autoencoder** trained on **log-mel spectrograms** of normal machine operating sounds. Detects anomalies by measuring how poorly the autoencoder reconstructs unseen sounds, combined with **Mahalanobis distance** scoring in the latent feature space.
+A comprehensive machine sound analysis and anomaly detection system. This repository implements two distinct approaches for detecting anomalous sounds (e.g., machine failures, friction, leaks) without ever seeing anomaly data during training:
 
-## Architecture
+1. **CNN Autoencoder (Reconstruction)** - Pure TensorFlow
+2. **STgram-MFN (Metric Learning via ArcFace)** - Pure PyTorch
 
+---
+
+## 🏛️ System Architecture
+
+```mermaid
+graph TD
+    A[Raw Audio .wav] -->|10s clips, 16kHz| B
+
+    subgraph "Autoencoder Approach (TensorFlow)"
+        B[Log-Mel Spectrogram] --> C(CNN Autoencoder)
+        C -->|Reconstructs| D(Reconstruction Error: MSE)
+        C -->|Latent Space| E(Mahalanobis Distance from Normal)
+        D --> F{Combined Score Thresholding}
+        E --> F
+    end
+
+    subgraph "STgram-MFN Approach (PyTorch)"
+        A --> G[TgramNet: 1D Temporal Features]
+        B --> H[MobileFaceNet: Spectral Features]
+        G --> I[Feature Fusion]
+        H --> I
+        I -->|ArcFace Angular Margin| J[128-dim Learned Embedding]
+        J --> K(Gaussian Mixture Model)
+        K --> L{Negative Log-Likelihood Score}
+    end
+
+    F --> Z[Output: NORMAL / ANOMALY]
+    L --> Z
 ```
-Audio (.wav)
-    │
-    ▼
-Log-Mel Spectrogram (128 mel bins, 16kHz, 10s clips)
-    │
-    ▼
-CNN Autoencoder (trained on NORMAL sounds only)
-    │
-    ├── Reconstruction Error (MSE between input and output)
-    │
-    └── Encoder → Latent Vector (256-dim)
-                    │
-                    ├── PCA Reduction (64-dim)
-                    │
-                    └── Mahalanobis Distance from "normal" distribution
-    │
-    ▼
-Combined Score → NORMAL / NEEDS MAINTENANCE / ANOMALY
-```
 
-## Quick Start
+---
+
+## ⚖️ Autoencoder vs STgram-MFN
+
+| Feature | CNN Autoencoder | STgram-MFN |
+|---------|-----------------|-------------|
+| **Core Idea** | Learn to reconstruct normal sounds. Anomalies yield high error. | Learn a highly discriminative latent space using angular margin loss. |
+| **Input Data** | Log-Mel Spectrograms | Raw Waveform + Log-Mel Spectrograms |
+| **Loss Function** | Mean Squared Error (MSE) | ArcFace (Additive Angular Margin) Loss |
+| **Generative Model** | Yes (Decodes back to spectrogram) | No (Pure feature extractor) |
+| **Anomaly Scoring** | Recon Error + Mahalanobis Distance | GMM Negative Log-Likelihood |
+| **Framework** | TensorFlow / Keras | PyTorch |
+| **Performance (AUC)** | Baseline (~0.62) | State-of-the-Art (~0.75+) |
+
+---
+
+## 🚀 Quick Start
 
 ### 1. Setup Environment
 
 ```bash
 # Create and activate virtual environment
-uv venv .venv
+python -m venv .venv
 # Windows:
 .venv\Scripts\activate
 # Linux/Mac:
 source .venv/bin/activate
 
 # Install dependencies
-uv pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 2. Prepare Data
 
-Download the [MIMII Dataset](https://zenodo.org/record/3384388) and place audio files:
+Place your dataset (e.g., MIMII DCASE dataset) inside the `data/` folder following this structure:
 
-```
+```text
 data/
-├── raw_audio/
-│   ├── train/          ← normal .wav files (for training)
-│   ├── source_test/    ← test .wav files (source domain)
-│   └── target_test/    ← test .wav files (target domain)
+└── raw_audio/
+    ├── train/          ← Normal machine operating sounds
+    ├── source_test/    ← Test set (source domain conditions)
+    └── target_test/    ← Test set (target domain conditions)
 ```
 
-### 3. Convert Audio to Spectrograms
+---
 
+## 🛠️ Running Model 1: CNN Autoencoder
+
+The Autoencoder approach runs locally via Python scripts and includes a Flask web interface.
+
+**1. Convert Audio to Spectrograms**
 ```bash
 python -m src.preprocessing
 ```
 
-This converts all `.wav` files to log-mel spectrogram `.png` images in `data/spectrograms/`.
-
-### 4. Train the Model
-
+**2. Train the Model**
 ```bash
 python -m src.autoencoder_train
-# Or with custom settings:
-python -m src.autoencoder_train --epochs 100 --batch-size 16
 ```
 
-Training features:
-- Early stopping (patience=15)
-- Learning rate reduction on plateau
-- Best model checkpointing
-- Saves both autoencoder and encoder separately
-
-### 5. Fit Anomaly Detector
-
+**3. Fit Anomaly Thresholds (Extract stats from normal data)**
 ```bash
 python -m src.autoencoder_evaluate --fit
 ```
 
-This extracts features from training data, fits PCA, and computes adaptive thresholds.
-
-### 6. Evaluate
-
+**4. Evaluate / Test**
 ```bash
-# Evaluate test sets
 python -m src.autoencoder_evaluate --test
-
-# Score a single audio file
-python -m src.autoencoder_evaluate --score path/to/audio.wav
 ```
 
-### 7. Web Interface
-
+**5. Launch Web UI**
 ```bash
 python -m app.app
-# Open http://localhost:5000
+# Open http://localhost:5000 in your browser
 ```
 
-Upload a `.wav` file and get instant classification with spectrogram visualization.
+---
 
-## Project Structure
+## 📓 Running Model 2: STgram-MFN
 
-```
+The STgram-MFN approach is optimized for Google Colab/Jupyter for rapid GPU training and rich visualization.
+
+1. Open `stgram_train.ipynb` in **Google Colab** (or Jupyter).
+2. Set Runtime to **GPU (T4 or higher)**.
+3. The notebook is fully self-contained and will:
+   - Symlink your Google Drive dataset
+   - Train the PyTorch model with ArcFace loss
+   - Extract embeddings and fit the Gaussian Mixture Model
+   - Output detailed visualizations (Waveforms, Spectrograms, t-SNE latent space plots, ROC curves, Score distributions)
+   - Save the finalized model to `models/stgram_mfn.pth`
+
+*(Note: STgram-MFN uses `section_0X` and `serial_no_0X` from the filename to dynamically generate classes for ArcFace training.)*
+
+---
+
+## 📁 Repository Structure
+
+```text
 Anomalous-Sound-Detection/
-├── config.py                 # All paths, hyperparameters, settings
-├── requirements.txt          # Python dependencies
+├── config.py                 # Central config (Paths, Sample Rate, Hyperparams)
+├── requirements.txt          # PyTorch, TensorFlow, librosa, sklearn
+│
+├── stgram_train.ipynb        # STgram-MFN Colab Pipeline & Visualizations
 │
 ├── src/
-│   ├── preprocessing.py      # Audio → Log-Mel spectrogram (single source of truth)
-│   ├── autoencoder_model.py  # CNN Autoencoder architecture
-│   ├── autoencoder_train.py  # Training pipeline with callbacks
-│   ├── autoencoder_evaluate.py # Anomaly scoring + batch evaluation
-│   └── utils.py              # Visualization utilities
+│   ├── preprocessing.py      # Core Audio-to-Mel logic used by both models
+│   ├── stgram_model.py       # PyTorch: TgramNet, MobileFaceNet, ArcFace
+│   ├── autoencoder_model.py  # TensorFlow: CNN Autoencoder architecture
+│   ├── autoencoder_train.py  # Autoencoder training loop
+│   ├── autoencoder_evaluate.py # Autoencoder scoring logic
+│   └── utils.py              # Autoencoder visualization utilities
 │
-├── app/
-│   ├── app.py                # Flask web application
-│   └── templates/
-│       └── index.html        # Upload + results UI
-│
-├── data/
-│   ├── raw_audio/            # Place .wav files here
-│   └── spectrograms/         # Generated .png spectrograms
-│
-└── models/                   # Saved model artifacts
-    ├── autoencoder.keras
-    ├── encoder.keras
-    ├── pca_model.joblib
-    └── anomaly_stats.joblib
+└── app/                      # Autoencoder Flask UI
+    ├── app.py
+    └── templates/index.html
 ```
-
-## Key Design Decisions
-
-| Decision | Rationale |
-|---|---|
-| **Autoencoder** (not classifier) | Only needs normal data for training; detects any anomaly, even unseen failure types |
-| **Log-Mel Spectrogram** | Matches human auditory perception; standard in DCASE benchmarks |
-| **128×128 input** | Mel spectrograms are 128 bins tall; no information wasted |
-| **Dual scoring** (recon error + Mahalanobis) | More robust than either method alone |
-| **Adaptive thresholds** | Derived from training data distribution, not hardcoded magic numbers |
-| **Single preprocessing module** | Train and inference use identical conversion — no train/serve skew |
-
-## Model Details
-
-- **Encoder**: 4 Conv2D blocks (32→64→128→256 filters) with BatchNorm + MaxPool → Dense(512) → Dense(256)
-- **Decoder**: Dense → Reshape → 4 Conv2DTranspose blocks → sigmoid output
-- **Loss**: MSE (reconstruction error)
-- **Optimizer**: Adam with ReduceLROnPlateau
-
-## API Reference
-
-### REST API
-
-```bash
-# Score audio via API
-curl -X POST http://localhost:5000/api/predict \
-  -F "audio_file=@machine_sound.wav"
-```
-
-Response:
-```json
-{
-    "classification": "NORMAL",
-    "mahalanobis_score": 5.234,
-    "reconstruction_error": 0.001234,
-    "file": "machine_sound.wav"
-}
-```
-
-## Requirements
-
-- Python 3.10+
-- TensorFlow 2.14+
-- See `requirements.txt` for full list
