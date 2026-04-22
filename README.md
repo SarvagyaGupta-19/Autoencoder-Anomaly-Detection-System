@@ -1,13 +1,41 @@
-# 🔊 Anomalous Sound Detection: Deep Learning Pipeline
-
-A comprehensive machine sound analysis and anomaly detection system. This repository implements two distinct approaches for detecting anomalous sounds (e.g., machine failures, friction, leaks) without ever seeing anomaly data during training:
-
-1. **CNN Autoencoder (Reconstruction)** - Pure TensorFlow
-2. **STgram-MFN (Metric Learning via ArcFace)** - Pure PyTorch
+<div align="center">
+  <h1>🔊 Deep Learning for Anomalous Sound Detection</h1>
+  <p><strong>An end-to-end Machine Learning pipeline to detect mechanical failures using auditory data, without needing prior anomaly samples.</strong></p>
+</div>
 
 ---
 
-## 🏛️ System Architecture
+## 📖 Overview
+Industrial machinery failures often begin with subtle changes in the sounds they produce. However, real-world "anomalous" sound data is rare and unpredictable. 
+
+This project solves the challenge of **unsupervised anomaly detection in machine sounds**. It learns what "normal" operation sounds like, and flags any deviation—such as friction, leaks, or wear—as an anomaly. This is achieved by combining digital signal processing (DSP) and state-of-the-art Deep Learning architectures.
+
+### 🎯 Key Highlights
+- **Zero-Anomaly Training**: Models are trained exclusively on normal operating sounds and still accurately detect unknown anomalies.
+- **Dual Architecture Pipeline**: Implements both a generative CNN Autoencoder (TensorFlow) and a discriminative STgram-MFN with ArcFace Loss (PyTorch).
+- **End-to-End MLOps**: Includes data preprocessing, feature extraction, model training, evaluation scripts, and a real-time Flask web interface for inference.
+
+---
+
+## 🛠️ Technology Stack
+- **Deep Learning Frameworks**: PyTorch, TensorFlow / Keras
+- **Audio Processing**: Librosa (Log-Mel Spectrograms, Waveform analysis)
+- **Machine Learning**: Scikit-Learn (PCA, Gaussian Mixture Models, Mahalanobis distance)
+- **Backend & UI**: Python, Flask, HTML/CSS
+- **Environment**: Google Colab (GPU Training), Jupyter Notebooks
+
+---
+
+## 🧠 Approach & Architecture
+
+### 1. Autoencoder Approach (TensorFlow)
+Uses a Convolutional Autoencoder to reconstruct Log-Mel Spectrograms of normal sounds. Anomalies are detected by measuring the Mean Squared Error (MSE) of the reconstruction combined with the Mahalanobis Distance of the latent space representation.
+
+### 2. STgram-MFN Approach (PyTorch)
+A state-of-the-art architecture combining temporal 1D features (TgramNet) and spectral 2D features (MobileFaceNet). Instead of reconstruction, it uses **ArcFace (Additive Angular Margin) Loss** to learn a highly discriminative latent embedding space. Anomalies are scored using the Negative Log-Likelihood of a Gaussian Mixture Model (GMM).
+
+<details>
+<summary><b>Click to View Architecture Diagram</b></summary>
 
 ```mermaid
 graph TD
@@ -34,120 +62,70 @@ graph TD
     F --> Z[Output: NORMAL / ANOMALY]
     L --> Z
 ```
+</details>
 
 ---
 
-## ⚖️ Autoencoder vs STgram-MFN
+## 📊 Model Evaluation & Outputs
 
-| Feature | CNN Autoencoder | STgram-MFN |
-|---------|-----------------|-------------|
-| **Core Idea** | Learn to reconstruct normal sounds. Anomalies yield high error. | Learn a highly discriminative latent space using angular margin loss. |
-| **Input Data** | Log-Mel Spectrograms | Raw Waveform + Log-Mel Spectrograms |
-| **Loss Function** | Mean Squared Error (MSE) | ArcFace (Additive Angular Margin) Loss |
-| **Generative Model** | Yes (Decodes back to spectrogram) | No (Pure feature extractor) |
-| **Anomaly Scoring** | Recon Error + Mahalanobis Distance | GMM Negative Log-Likelihood |
-| **Framework** | TensorFlow / Keras | PyTorch |
-| **Performance (AUC)** | Baseline (~0.62) | State-of-the-Art (~0.75+) |
+Below are the results and visualizations directly extracted from our STgram-MFN model training pipeline:
+
+### Waveforms and Log-Mel Spectrograms
+Audio signals are transformed into spatial representations to allow deep spatial learning.
+![Waveform and Spectrogram](assets/waveform_spectrogram.png)
+
+### Training Metrics
+Consistent convergence of the ArcFace loss demonstrating stable metric learning.
+![Training Metrics](assets/training_metrics.png)
+
+### Latent Space Visualization & ROC Performance
+t-SNE projection of the 128-dimensional embedding space, showing clear separation between normal conditions (tight clusters) and varied anomalies (scattered). The ROC curve demonstrates strong discriminative performance (High AUC).
+![t-SNE and ROC Curve](assets/tsne_roc.png)
+
+### Anomaly Score Distribution
+Histogram comparing the Negative Log-Likelihood scores assigned to normal data vs. anomalous data. The clear boundary enables robust thresholding.
+![Score Distribution](assets/score_distribution.png)
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start & Usage
 
 ### 1. Setup Environment
-
 ```bash
-# Create and activate virtual environment
 python -m venv .venv
 # Windows:
 .venv\Scripts\activate
 # Linux/Mac:
 source .venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Prepare Data
-
-Place your dataset (e.g., MIMII DCASE dataset) inside the `data/` folder following this structure:
-
-```text
-data/
-└── raw_audio/
-    ├── train/          ← Normal machine operating sounds
-    ├── source_test/    ← Test set (source domain conditions)
-    └── target_test/    ← Test set (target domain conditions)
-```
-
----
-
-## 🛠️ Running Model 1: CNN Autoencoder
-
-The Autoencoder approach runs locally via Python scripts and includes a Flask web interface.
-
-**1. Convert Audio to Spectrograms**
-```bash
-python -m src.preprocessing
-```
-
-**2. Train the Model**
-```bash
-python -m src.autoencoder_train
-```
-
-**3. Fit Anomaly Thresholds (Extract stats from normal data)**
-```bash
-python -m src.autoencoder_evaluate --fit
-```
-
-**4. Evaluate / Test**
-```bash
-python -m src.autoencoder_evaluate --test
-```
-
-**5. Launch Web UI**
+### 2. Run the Web Interface (Inference)
+The project includes a Flask-based web interface to upload an audio file or spectrogram image and get an instant "Normal", "Needs Maintenance", or "Severe Anomaly" classification.
 ```bash
 python -m app.app
 # Open http://localhost:5000 in your browser
 ```
 
----
+### 3. Model Training
+#### STgram-MFN (PyTorch)
+Optimized for Google Colab. Open `stgram_modeltraining.ipynb` with a GPU runtime to train the ArcFace model, compute embeddings, fit the GMM, and generate the visualizations seen above.
 
-## 📓 Running Model 2: STgram-MFN
-
-The STgram-MFN approach is optimized for Google Colab/Jupyter for rapid GPU training and rich visualization.
-
-1. Open `stgram_train.ipynb` in **Google Colab** (or Jupyter).
-2. Set Runtime to **GPU (T4 or higher)**.
-3. The notebook is fully self-contained and will:
-   - Symlink your Google Drive dataset
-   - Train the PyTorch model with ArcFace loss
-   - Extract embeddings and fit the Gaussian Mixture Model
-   - Output detailed visualizations (Waveforms, Spectrograms, t-SNE latent space plots, ROC curves, Score distributions)
-   - Save the finalized model to `models/stgram_mfn.pth`
-
-*(Note: STgram-MFN uses `section_0X` and `serial_no_0X` from the filename to dynamically generate classes for ArcFace training.)*
+#### CNN Autoencoder (TensorFlow)
+Train locally via CLI:
+```bash
+python -m src.preprocessing         # 1. Convert Audio to Spectrograms
+python -m src.autoencoder_train     # 2. Train the Model
+python -m src.autoencoder_evaluate --fit  # 3. Fit Anomaly Thresholds
+python -m src.autoencoder_evaluate --test # 4. Evaluate Test Set
+```
 
 ---
 
 ## 📁 Repository Structure
-
-```text
-Anomalous-Sound-Detection/
-├── config.py                 # Central config (Paths, Sample Rate, Hyperparams)
-├── requirements.txt          # PyTorch, TensorFlow, librosa, sklearn
-│
-├── stgram_train.ipynb        # STgram-MFN Colab Pipeline & Visualizations
-│
-├── src/
-│   ├── preprocessing.py      # Core Audio-to-Mel logic used by both models
-│   ├── stgram_model.py       # PyTorch: TgramNet, MobileFaceNet, ArcFace
-│   ├── autoencoder_model.py  # TensorFlow: CNN Autoencoder architecture
-│   ├── autoencoder_train.py  # Autoencoder training loop
-│   ├── autoencoder_evaluate.py # Autoencoder scoring logic
-│   └── utils.py              # Autoencoder visualization utilities
-│
-└── app/                      # Autoencoder Flask UI
-    ├── app.py
-    └── templates/index.html
-```
+- `stgram_modeltraining.ipynb`: Full PyTorch training pipeline, GMM fitting, and visualization code.
+- `src/`: Core Python modules for audio processing, PyTorch (`stgram_model.py`), and TensorFlow architectures.
+- `app/`: Flask application, UI templates, and API endpoints.
+- `assets/`: Model evaluation images and plots.
+- `models/` & `data/`: Model checkpoints and raw `.wav` datasets (ignored in source control).
