@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🔊 Deep Learning for Anomalous Sound Detection</h1>
+  <h1>🔊 Deep Learning for Anomalous Sound Detection!</h1>
   <p><strong>An end-to-end Machine Learning pipeline to detect mechanical failures using auditory data, without needing prior anomaly samples.</strong></p>
 </div>
 
